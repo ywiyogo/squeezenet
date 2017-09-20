@@ -26,6 +26,8 @@ Run this command after running the `squeezenet-tf.py`.
 
     tensorboard --logdir logs
 
+![image1]
+
 ## Dependencies
 * [TensorFlow](https://www.tensorflow.org/versions/master/get_started/os_setup.html#download-and-setup)
 * [NumPy](https://github.com/numpy/numpy/blob/master/INSTALL.rst.txt)
@@ -38,4 +40,4 @@ Based on the [Avoroshilov's Github](https://github.com/avoroshilov/tf-squeezenet
 [sqz_arxiv]: https://arxiv.org/abs/1602.07360
 [SqueezeNet_github]: https://github.com/DeepScale/SqueezeNet
 [SqueezeNet_v11]: https://github.com/DeepScale/SqueezeNet/tree/master/SqueezeNet_v1.1
-
+[image1]: squeezenet_graph_full.png "Squeezenet"
