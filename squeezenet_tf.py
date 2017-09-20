@@ -106,76 +106,82 @@ def net_preloaded(preloaded, input_image, pooling, needs_classifier=False, keep_
     #####################
     
     # conv1 cluster
-    layer_name = 'conv1'
-    weights, biases = get_weights_biases(preloaded, layer_name)
-    x = _conv_layer(net, layer_name + '_conv', x, weights, biases, padding='VALID', stride=(2, 2))
-    x = _act_layer(net, layer_name + '_actv', x)
-    x = _pool_layer(net, 'pool1_pool', x, pooling, size=(3, 3), stride=(2, 2), padding='VALID')
+    with tf.name_scope("FeatureExtractor"):
+        layer_name = 'conv1'
+        weights, biases = get_weights_biases(preloaded, layer_name)
+        x = _conv_layer(net, layer_name + '_conv', x, weights, biases, padding='VALID', stride=(2, 2))
+        x = _act_layer(net, layer_name + '_actv', x)
+        x = _pool_layer(net, 'pool1_pool', x, pooling, size=(3, 3), stride=(2, 2), padding='VALID')
 
-    # fire2 + fire3 clusters
-    x = fire_cluster(net, x, preloaded, cluster_name='fire2')
-    fire2_bypass = x
-    x = fire_cluster(net, x, preloaded, cluster_name='fire3')
-    x = _pool_layer(net, 'pool3_pool', x, pooling, size=(3, 3), stride=(2, 2), padding='VALID')
+        # fire2 + fire3 clusters
+        x = fire_cluster(net, x, preloaded, cluster_name='fire2')
+        fire2_bypass = x
+        x = fire_cluster(net, x, preloaded, cluster_name='fire3')
+        x = _pool_layer(net, 'pool3_pool', x, pooling, size=(3, 3), stride=(2, 2), padding='VALID')
 
-    # fire4 + fire5 clusters
-    x = fire_cluster(net, x, preloaded, cluster_name='fire4')
-    fire4_bypass = x
-    x = fire_cluster(net, x, preloaded, cluster_name='fire5')
-    x = _pool_layer(net, 'pool5_pool', x, pooling, size=(3, 3), stride=(2, 2), padding='VALID')
+        # fire4 + fire5 clusters
+        x = fire_cluster(net, x, preloaded, cluster_name='fire4')
+        fire4_bypass = x
+        x = fire_cluster(net, x, preloaded, cluster_name='fire5')
+        x = _pool_layer(net, 'pool5_pool', x, pooling, size=(3, 3), stride=(2, 2), padding='VALID')
 
-    # remainder (no pooling)
-    x = fire_cluster(net, x, preloaded, cluster_name='fire6')
-    fire6_bypass = x
-    x = fire_cluster(net, x, preloaded, cluster_name='fire7')
-    x = fire_cluster(net, x, preloaded, cluster_name='fire8')
-    x = fire_cluster(net, x, preloaded, cluster_name='fire9')
+        # remainder (no pooling)
+        x = fire_cluster(net, x, preloaded, cluster_name='fire6')
+        fire6_bypass = x
+        x = fire_cluster(net, x, preloaded, cluster_name='fire7')
+        x = fire_cluster(net, x, preloaded, cluster_name='fire8')
+        x = fire_cluster(net, x, preloaded, cluster_name='fire9')
     
     # Classifier
     #####################
     if needs_classifier == True:
-        # Dropout [use value of 50% when training]
-        x = tf.nn.dropout(x, keep_prob)
-    
-        # Fixed global avg pool/softmax classifier:
-        # [227, 227, 3] -> 1000 classes
-        layer_name = 'conv10'
-        weights, biases = get_weights_biases(preloaded, layer_name)
-        x = _conv_layer(net, layer_name + '_conv', x, weights, biases)
-        x = _act_layer(net, layer_name + '_actv', x)
+        with tf.name_scope("Classifier"):
+            # Dropout [use value of 50% when training]
+            x = tf.nn.dropout(x, keep_prob)
         
-        # Global Average Pooling
-        x = tf.nn.avg_pool(x, ksize=(1, 13, 13, 1), strides=(1, 1, 1, 1), padding='VALID')
-        net['classifier_pool'] = x
-        
-        x = tf.nn.softmax(x)
-        net['classifier_actv'] = x
-    
+            # Fixed global avg pool/softmax classifier:
+            # [227, 227, 3] -> 1000 classes
+            layer_name = 'conv10'
+            weights, biases = get_weights_biases(preloaded, layer_name)
+            x = _conv_layer(net, layer_name + '_conv', x, weights, biases)
+            x = _act_layer(net, layer_name + '_actv', x)
+            
+            # Global Average Pooling
+            x = tf.nn.avg_pool(x, ksize=(1, 13, 13, 1), strides=(1, 1, 1, 1), padding='VALID')
+            net['classifier_pool'] = x
+            tf.summary.scalar("classifier_pool", x)
+
+            x = tf.nn.softmax(x)
+            net['classifier_actv'] = x
+            tf.summary.scalar("classifier_actv", x)
     print("Network instance created: %fs" % (time.time() - cr_time))
    
     return net
     
 def _conv_layer(net, name, input, weights, bias, padding='SAME', stride=(1, 1)):
-    conv = tf.nn.conv2d(input, tf.constant(weights), strides=(1, stride[0], stride[1], 1),
-            padding=padding)
-    x = tf.nn.bias_add(conv, bias)
-    net[name] = x
-    return x
+    with tf.name_scope(name):
+        conv = tf.nn.conv2d(input, tf.constant(weights), strides=(1, stride[0], stride[1], 1),
+                padding=padding)
+        x = tf.nn.bias_add(conv, bias)
+        net[name] = x
+        return x
 
 def _act_layer(net, name, input):
-    x = tf.nn.relu(input)
-    net[name] = x
-    return x
+    with tf.name_scope(name):
+        x = tf.nn.relu(input)
+        net[name] = x
+        return x
     
 def _pool_layer(net, name, input, pooling, size=(2, 2), stride=(3, 3), padding='SAME'):
-    if pooling == 'avg':
-        x = tf.nn.avg_pool(input, ksize=(1, size[0], size[1], 1), strides=(1, stride[0], stride[1], 1),
-                padding=padding)
-    else:
-        x = tf.nn.max_pool(input, ksize=(1, size[0], size[1], 1), strides=(1, stride[0], stride[1], 1),
-                padding=padding)
-    net[name] = x
-    return x
+    with tf.name_scope(name):
+        if pooling == 'avg':
+            x = tf.nn.avg_pool(input, ksize=(1, size[0], size[1], 1), strides=(1, stride[0], stride[1], 1),
+                    padding=padding)
+        else:
+            x = tf.nn.max_pool(input, ksize=(1, size[0], size[1], 1), strides=(1, stride[0], stride[1], 1),
+                    padding=padding)
+        net[name] = x
+        return x
 
 def build_parser():
     ps = ArgumentParser()
@@ -211,9 +217,21 @@ def main():
     with g.as_default(), tf.Session(config=config) as sess:
         # Building network
         image = tf.placeholder(dtype=get_dtype_tf(), shape=img_content_shape, name="image_placeholder")
-        keep_prob = tf.placeholder(get_dtype_tf())
+        keep_prob = tf.placeholder(get_dtype_tf(), name="keep_prob")
         sqznet = net_preloaded(data, image, 'max', True, keep_prob)
 
+        # Tensorflow visualization
+        # Get the model directory
+        tf.summary.image('input', image, 3)
+        summ = tf.summary.merge_all()
+        LOG_DIR = os.getcwd()+ "/logs"
+        for dirpath, dirnames, files in os.walk(LOG_DIR):
+            if files:
+                print(dirpath, ' has files. Please remove the old graphs!')
+
+        summary_writer = tf.summary.FileWriter(LOG_DIR, graph=sess.graph)
+        #print("graph: ",sess.graph.get_operations())
+        
         # Classifying
         sqznet_results = sqznet['classifier_actv'].eval(feed_dict={image: [preprocess(img_content, sqz_mean)], keep_prob: 1.})[0][0][0]
 

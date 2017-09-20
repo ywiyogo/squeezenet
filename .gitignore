@@ -1,0 +1,5 @@
+# ignore sample imgaes
+*.jpg
+# ignore logs directory
+logs/
+
